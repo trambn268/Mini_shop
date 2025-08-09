@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cửa hàng đơn giản</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+    }
+    body {
+      margin: 0;
+      background: #f4f6f8;
+      color: #333;
+    }
+    header {
+      background: #007bff;
+      color: white;
+      padding: 10px 20px;
+      text-align: center;
+    }
+    .container {
+      max-width: 900px;
+      margin: auto;
+      padding: 20px;
+    }
+    .hidden { display: none; }
+    input, button, select {
+      padding: 10px;
+      margin: 5px 0;
+      width: 100%;
+    }
+    .product, .order {
+      border: 1px solid #ddd;
+      background: #fff;
+      padding: 15px;
+      margin-bottom: 10px;
+      border-radius: 5px;
+    }
+    .product-actions button {
+      margin-right: 5px;
+    }
+    .cart-item {
+      border-bottom: 1px dashed #ccc;
+      padding: 5px 0;
+    }
+    .section {
+      margin-bottom: 30px;
+    }
+    .role-btns button {
+      width: 49%;
+    }
+    @media (max-width: 600px) {
+      .role-btns button {
+        width: 100%;
+        margin-bottom: 10px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Cửa hàng đơn giản</h1>
+  </header>
+  <div class="container">
+    <div id="roleSelect" class="section">
+      <h2>Bạn là:</h2>
+      <div class="role-btns">
+        <button onclick="showLogin('buyer')">Người mua</button>
+        <button onclick="showLogin('admin')">Người bán</button>
+      </div>
+    </div>
+
+    <div id="loginBuyer" class="section hidden">
+      <h2>Đăng nhập / Đăng ký</h2>
+      <input type="text" id="buyerName" placeholder="Nhập tên của bạn">
+      <button onclick="loginBuyer()">Tiếp tục</button>
+    </div>
+
+    <div id="loginAdmin" class="section hidden">
+      <h2>Đăng nhập người bán</h2>
+      <input type="password" id="adminPass" placeholder="Mật khẩu người bán">
+      <button onclick="loginAdmin()">Đăng nhập</button>
+    </div>
+
+    <div id="buyerUI" class="hidden">
+      <h2>Xin chào, <span id="buyerUsername"></span></h2>
+      <div class="section">
+        <h3>Sản phẩm</h3>
+        <div id="productList"></div>
+      </div>
+      <div class="section">
+        <h3>Giỏ hàng</h3>
+        <div id="cart"></div>
+        <p><strong>Tổng tiền:</strong> <span id="total"></span></p>
+        <button onclick="checkout()">Mua hàng</button>
+        <button onclick="clearCart()">Xoá giỏ hàng</button>
+      </div>
+      <div class="section">
+        <h3>Đơn hàng đã mua</h3>
+        <div id="purchaseHistory"></div>
+      </div>
+      <button onclick="logout()">Thoát</button>
+    </div>
+
+    <div id="adminUI" class="hidden">
+      <h2>Quản lý người bán</h2>
+      <div class="section">
+        <h3>Thêm sản phẩm</h3>
+        <input type="text" id="newProductName" placeholder="Tên sản phẩm">
+        <input type="number" id="newProductPrice" placeholder="Giá">
+        <button onclick="addProduct()">Thêm</button>
+      </div>
+      <div class="section">
+        <h3>Danh sách sản phẩm</h3>
+        <div id="adminProductList"></div>
+      </div>
+      <div class="section">
+        <h3>Đơn hàng</h3>
+        <div id="orders"></div>
+      </div>
+      <button onclick="logout()">Thoát</button>
+    </div>
+  </div>
+
+  <script>
+    let products = JSON.parse(localStorage.getItem('products')) || [
+      { name: "Sản phẩm A", price: 10000 },
+      { name: "Sản phẩm B", price: 20000 }
+    ];
+    let cart = JSON.parse(localStorage.getItem('cart')) || {};
+    let orders = JSON.parse(localStorage.getItem('orders')) || [];
+    let buyer = localStorage.getItem('buyer');
+
+    function saveAll() {
+      localStorage.setItem('products', JSON.stringify(products));
+      localStorage.setItem('cart', JSON.stringify(cart));
+      localStorage.setItem('orders', JSON.stringify(orders));
+    }
+
+    function showLogin(role) {
+      document.getElementById('roleSelect').classList.add('hidden');
+      if (role === 'buyer') {
+        document.getElementById('loginBuyer').classList.remove('hidden');
+      } else {
+        document.getElementById('loginAdmin').classList.remove('hidden');
+      }
+    }
+
+    function loginBuyer() {
+      let name = document.getElementById('buyerName').value;
+      if (!name) return alert("Nhập tên");
+      buyer = name;
+      localStorage.setItem('buyer', name);
+      cart = JSON.parse(localStorage.getItem('cart_' + buyer)) || {};
+      showBuyerUI();
+    }
+
+    function loginAdmin() {
+      let pass = document.getElementById('adminPass').value;
+      if (pass === "admin123") {
+        showAdminUI();
+      } else alert("Sai mật khẩu");
+    }
+
+    function logout() {
+      localStorage.removeItem('buyer');
+      location.reload();
+    }
+
+    function showBuyerUI() {
+      document.getElementById('loginBuyer').classList.add('hidden');
+      document.getElementById('buyerUI').classList.remove('hidden');
+      document.getElementById('buyerUsername').innerText = buyer;
+      renderProducts();
+      renderCart();
+      renderHistory();
+    }
+
+    function showAdminUI() {
+      document.getElementById('loginAdmin').classList.add('hidden');
+      document.getElementById('adminUI').classList.remove('hidden');
+      renderAdminProducts();
+      renderOrders();
+    }
+
+    function renderProducts() {
+      let html = "";
+      products.forEach((p, i) => {
+        html += `<div class='product'>
+          <strong>${p.name}</strong> - ${p.price}₫<br>
+          <div class='product-actions'>
+            <button onclick='addToCart(${i})'>Thêm vào giỏ</button>
+          </div>
+        </div>`;
+      });
+      document.getElementById('productList').innerHTML = html;
+    }
+
+    function renderCart() {
+      let html = "", total = 0;
+      for (let key in cart) {
+        let item = cart[key];
+        total += item.qty * item.price;
+        html += `<div class='cart-item'>${item.name} - ${item.qty} x ${item.price}₫ = ${item.qty * item.price}₫
+          <button onclick='changeQty("${key}", 1)'>+</button>
+          <button onclick='changeQty("${key}", -1)'>-</button>
+          <button onclick='removeItem("${key}")'>X</button>
+        </div>`;
+      }
+      document.getElementById('cart').innerHTML = html;
+      document.getElementById('total').innerText = total + '₫';
+      localStorage.setItem('cart_' + buyer, JSON.stringify(cart));
+    }
+
+    function renderHistory() {
+      let html = "";
+      let userOrders = orders.filter(o => o.buyer === buyer);
+      userOrders.forEach(o => {
+        html += `<div class='order'><strong>${o.date}</strong><ul>`;
+        if (Array.isArray(o.items)) {
+          o.items.forEach(i => {
+            html += `<li>${i.name} x ${i.qty} = ${i.price * i.qty}₫</li>`;
+          });
+        }
+        html += `</ul></div>`;
+      });
+      document.getElementById('purchaseHistory').innerHTML = html;
+    }
+
+    function addToCart(i) {
+      let p = products[i];
+      if (!cart[p.name]) cart[p.name] = { name: p.name, price: p.price, qty: 1 };
+      else cart[p.name].qty++;
+      renderCart();
+    }
+
+    function changeQty(name, delta) {
+      if (cart[name]) {
+        cart[name].qty += delta;
+        if (cart[name].qty <= 0) delete cart[name];
+        renderCart();
+      }
+    }
+
+    function removeItem(name) {
+      delete cart[name];
+      renderCart();
+    }
+
+    function clearCart() {
+      cart = {};
+      renderCart();
+    }
+
+    function checkout() {
+      if (Object.keys(cart).length === 0) return alert("Giỏ hàng trống");
+      let items = Object.values(cart);
+      let order = {
+        buyer: buyer,
+        items: items,
+        status: "Đã đặt",
+        date: new Date().toLocaleString()
+      };
+      orders.push(order);
+      cart = {};
+      saveAll();
+      renderCart();
+      renderHistory();
+      alert("Đặt hàng thành công!");
+    }
+
+    function renderAdminProducts() {
+      let html = "";
+      products.forEach((p, i) => {
+        html += `<div class='product'><strong>${p.name}</strong> - ${p.price}₫
+        <button onclick='removeProduct(${i})'>Xoá</button></div>`;
+      });
+      document.getElementById('adminProductList').innerHTML = html;
+    }
+
+    function addProduct() {
+      let name = document.getElementById('newProductName').value;
+      let price = parseInt(document.getElementById('newProductPrice').value);
+      if (!name || isNaN(price)) return alert("Nhập đủ thông tin");
+      products.push({ name, price });
+      saveAll();
+      renderAdminProducts();
+    }
+
+    function removeProduct(i) {
+      products.splice(i, 1);
+      saveAll();
+      renderAdminProducts();
+    }
+
+    function renderOrders() {
+      let html = "";
+      orders.forEach((o, i) => {
+        html += `<div class='order'><strong>${o.buyer}</strong> (${o.date}) - ${o.status}<br><ul>`;
+        if (Array.isArray(o.items)) {
+          o.items.forEach(it => {
+            html += `<li>${it.name} x ${it.qty}</li>`;
+          });
+        }
+        html += `</ul>
+        <button onclick='updateOrderStatus(${i},"Hoàn thành")'>Hoàn thành</button>
+        <button onclick='updateOrderStatus(${i},"Huỷ")'>Huỷ</button></div>`;
+      });
+      document.getElementById('orders').innerHTML = html;
+    }
+
+    function updateOrderStatus(i, status) {
+      orders[i].status = status;
+      if (status !== "Đã đặt") {
+        localStorage.removeItem('cart_' + orders[i].buyer);
+      }
+      saveAll();
+      renderOrders();
+    }
+
+    // Auto login if buyer was saved
+    if (buyer) {
+      showBuyerUI();
+    }
+  </script>
+</body>
+</html>
